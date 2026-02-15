@@ -1,0 +1,8 @@
+# Default executable
+
+agent-chroma
+
+# AI agents
+.claude
+
+*.DS_Store

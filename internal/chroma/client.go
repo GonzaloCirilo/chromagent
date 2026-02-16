@@ -68,7 +68,7 @@ func NewClient() (*Client, error) {
 	appInfo := AppInfo{
 		Title:           "Chroma Hook for AI agents",
 		Description:     "Razer Chroma RGB lighting driven by AI agent hook events",
-		Author:          Author{},
+		Author:          Author{Name: "chromagent", Contact: "https://github.com/GonzaloCirilo/chromagent"},
 		DeviceSupported: []string{"keyboard", "mouse", "mousepad", "headset", "keypad", "chromalink"},
 		Category:        "application",
 	}
@@ -105,6 +105,9 @@ func NewClient() (*Client, error) {
 		httpClient: httpClient,
 		stopHB:     make(chan struct{}),
 	}
+
+	// The SDK needs a moment after init before it accepts effect commands.
+	time.Sleep(500 * time.Millisecond)
 
 	go c.heartbeatLoop()
 	return c, nil

@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/claude-chroma",
+            "command": "/path/to/chromagent",
             "timeout": 10
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/claude-chroma",
+            "command": "/path/to/chromagent",
             "timeout": 10
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/claude-chroma",
+            "command": "/path/to/chromagent",
             "timeout": 5
           }
         ]
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/claude-chroma",
+            "command": "/path/to/chromagent",
             "timeout": 5
           }
         ]
@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/claude-chroma",
+            "command": "/path/to/chromagent",
             "timeout": 5
           }
         ]
@@ -62,8 +62,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/claude-chroma",
+            "command": "/path/to/chromagent",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 5
           }
         ]
       }
@@ -73,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/claude-chroma",
+            "command": "/path/to/chromagent",
             "timeout": 10
           }
         ]
@@ -81,10 +92,21 @@
     ],
     "Notification": [
       {
+        "matcher": "permission_prompt",
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/claude-chroma",
+            "command": "/path/to/chromagent",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
             "timeout": 10
           }
         ]
@@ -95,7 +117,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/claude-chroma",
+            "command": "/path/to/chromagent",
             "timeout": 5
           }
         ]

@@ -80,15 +80,159 @@ Full API reference: https://assets.razerzone.com/dev_portal/REST/html/index.html
 
 ## Install
 
+**Linux / macOS:**
+
 ```bash
-git clone https://github.com/GonzaloCirilo/agent-chroma.git
-cd agent-chroma
-bash install.sh
+git clone https://github.com/GonzaloCirilo/chromagent.git
+cd chromagent
+bash scripts/install.sh
+```
+
+**Windows:**
+
+```cmd
+git clone https://github.com/GonzaloCirilo/chromagent.git
+cd chromagent
+scripts\install.bat
 ```
 
 ### Claude Code
 
-Register the binary path in `~/.claude/settings.json` (see `example-settings.json`), or use `/hooks` inside Claude Code.
+Register hooks in your `~/.claude/settings.json` or use `/hooks` inside Claude Code. See the [hooks reference](https://code.claude.com/docs/en/hooks) for full documentation.
+
+Example configuration (replace the path with your actual binary location):
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/chromagent",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+See `example-settings.json` for the same configuration as a standalone file.
 
 ### Cursor
 
@@ -109,9 +253,9 @@ JSON shape — no flags needed.
 
 On first run, a config file is created with default colors at:
 
-- **macOS**: `~/Library/Application Support/agent-chroma/config.json`
-- **Linux**: `~/.config/agent-chroma/config.json`
-- **Windows**: `%AppData%/agent-chroma/config.json`
+- **macOS**: `~/Library/Application Support/chromagent/config.json`
+- **Linux**: `~/.config/chromagent/config.json`
+- **Windows**: `%AppData%/chromagent/config.json`
 
 Edit the RGB values `[R, G, B]` to customize colors per event:
 
@@ -191,7 +335,7 @@ ParseEvent(raw json.RawMessage) (agents.AgentEvent, error)
 ```
 
 3. Register via `init()`: `agents.Register(&Adapter{})`
-4. Add a blank import in `cmd/agent-chroma/main.go`
+4. Add a blank import in `cmd/chromagent/main.go`
 
 The `Detect` method should check for JSON fields unique to your agent. `ParseEvent` maps agent-specific events to
 canonical `AgentEvent` values.

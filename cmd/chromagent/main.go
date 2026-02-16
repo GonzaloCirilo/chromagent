@@ -84,29 +84,29 @@ func main() {
 	// Read the hook JSON from stdin.
 	var raw json.RawMessage
 	if err := json.NewDecoder(os.Stdin).Decode(&raw); err != nil {
-		fmt.Fprintf(os.Stderr, "[agent-chroma] Failed to read stdin: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[chromagent] Failed to read stdin: %v\n", err)
 		os.Exit(0) // Exit 0 so we don't block the agent.
 	}
 
 	// Auto-detect which agent sent this event.
 	adapter := agents.DetectAdapter(raw)
 	if adapter == nil {
-		fmt.Fprintf(os.Stderr, "[agent-chroma] No adapter matched the input JSON\n")
+		fmt.Fprintf(os.Stderr, "[chromagent] No adapter matched the input JSON\n")
 		os.Exit(0)
 	}
-	fmt.Fprintf(os.Stderr, "[agent-chroma] Detected agent: %s\n", adapter.Name())
+	fmt.Fprintf(os.Stderr, "[chromagent] Detected agent: %s\n", adapter.Name())
 
 	// Parse the raw JSON into a canonical event.
 	event, err := adapter.ParseEvent(raw)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[agent-chroma] Failed to parse event: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[chromagent] Failed to parse event: %v\n", err)
 		os.Exit(0)
 	}
 
 	// Initialize Chroma SDK session.
 	client, err := chroma.NewClient()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[agent-chroma] Chroma SDK init failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[chromagent] Chroma SDK init failed: %v\n", err)
 		os.Exit(0)
 	}
 	defer client.Close()

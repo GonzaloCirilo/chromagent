@@ -38,14 +38,14 @@ func configPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve config dir: %w", err)
 	}
-	return filepath.Join(dir, "agent-chroma", "config.json"), nil
+	return filepath.Join(dir, "chromagent", "config.json"), nil
 }
 
 // writeDefaults creates the config file with default values so users can
 // easily discover and edit it.
 func writeDefaults(path string, cfg *Config) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "[agent-chroma] Failed to create config dir: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[chromagent] Failed to create config dir: %v\n", err)
 		return
 	}
 
@@ -55,7 +55,7 @@ func writeDefaults(path string, cfg *Config) {
 	}
 
 	if err := os.WriteFile(path, data, 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "[agent-chroma] Failed to write default config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[chromagent] Failed to write default config: %v\n", err)
 	}
 }
 
@@ -78,7 +78,7 @@ func Load() *Config {
 
 	var userCfg Config
 	if err := json.Unmarshal(data, &userCfg); err != nil {
-		fmt.Fprintf(os.Stderr, "[agent-chroma] Invalid config %s: %v\n", path, err)
+		fmt.Fprintf(os.Stderr, "[chromagent] Invalid config %s: %v\n", path, err)
 		return cfg
 	}
 

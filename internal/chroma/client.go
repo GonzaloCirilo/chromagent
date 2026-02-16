@@ -86,7 +86,7 @@ func NewClient() (*Client, error) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			_ = fmt.Errorf("closing reponse body: %w", err)
+			_ = fmt.Errorf("closing response body: %w", err)
 		}
 	}(resp.Body)
 
@@ -138,10 +138,9 @@ func (c *Client) Close() {
 // ---------- Effect helpers ----------
 
 // StaticEffect sets a single color across a device type.
-// device: "keyboard", "mouse", "mousepad", "headset", "keypad", "chromalink"
-func (c *Client) StaticEffect(device string, color int) error {
+func (c *Client) StaticEffect(device DeviceType, color int) error {
 	payload := map[string]interface{}{
-		"effect": "CHROMA_STATIC",
+		"effect": EffectStatic,
 		"param": map[string]interface{}{
 			"color": color,
 		},
@@ -150,18 +149,54 @@ func (c *Client) StaticEffect(device string, color int) error {
 }
 
 // NoEffect turns off all LEDs on a device.
-func (c *Client) NoEffect(device string) error {
+func (c *Client) NoEffect(device DeviceType) error {
 	payload := map[string]interface{}{
-		"effect": "CHROMA_NONE",
+		"effect": EffectNone,
 	}
 	return c.putEffect(device, payload)
 }
 
+// CustomEffect sets per-key/per-LED colors on a device.
+// For grid devices (keyboard, mouse, keypad): pass a 2D array [rows][cols].
+// For linear devices (chromalink, headset, mousepad): pass a single row [[led0, led1, ...]].
+func (c *Client) CustomEffect(device DeviceType, colors interface{}) error {
+	payload := map[string]interface{}{
+		"effect": EffectCustom,
+		"param":  colors,
+	}
+	return c.putEffect(device, payload)
+}
+
+// CustomEffect2 sets a CHROMA_CUSTOM2 effect (keyboard only).
+// colors is the base color grid [rows][cols], keys is the key-specific overlay.
+func (c *Client) CustomEffect2(device DeviceType, colors [][]int, keys [][]int) error {
+	payload := map[string]interface{}{
+		"effect": EffectCustom2,
+		"param": map[string]interface{}{
+			"color": colors,
+			"key":   keys,
+		},
+	}
+	return c.putEffect(device, payload)
+}
+
+// CustomKeyEffect sets a CHROMA_CUSTOM_KEY effect (keyboard only).
+// colors is the base color grid, keys is the per-key overlay.
+func (c *Client) CustomKeyEffect(colors [][]int, keys [][]int) error {
+	payload := map[string]interface{}{
+		"effect": EffectCustomKey,
+		"param": map[string]interface{}{
+			"color": colors,
+			"key":   keys,
+		},
+	}
+	return c.putEffect(DeviceKeyboard, payload)
+}
+
 // StaticAll sets the same static color across all supported devices.
 func (c *Client) StaticAll(color int) error {
-	devices := []string{"keyboard", "mouse", "mousepad", "headset", "keypad", "chromalink"}
 	var lastErr error
-	for _, d := range devices {
+	for _, d := range AllDevices {
 		if err := c.StaticEffect(d, color); err != nil {
 			lastErr = err
 		}
@@ -171,9 +206,8 @@ func (c *Client) StaticAll(color int) error {
 
 // ClearAll turns off all devices.
 func (c *Client) ClearAll() error {
-	devices := []string{"keyboard", "mouse", "mousepad", "headset", "keypad", "chromalink"}
 	var lastErr error
-	for _, d := range devices {
+	for _, d := range AllDevices {
 		if err := c.NoEffect(d); err != nil {
 			lastErr = err
 		}
@@ -181,13 +215,92 @@ func (c *Client) ClearAll() error {
 	return lastErr
 }
 
-func (c *Client) putEffect(device string, payload interface{}) error {
+// PostEffect creates an effect via POST and returns the effect ID for later use.
+func (c *Client) PostEffect(device DeviceType, payload interface{}) (string, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal effect: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/%s", c.baseURI, device)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("post effect to %s: %w", device, err)
+	}
+	defer resp.Body.Close()
+
+	var effectResp EffectResponse
+	if err := json.NewDecoder(resp.Body).Decode(&effectResp); err != nil {
+		return "", fmt.Errorf("parse effect response: %w", err)
+	}
+	if effectResp.Result != 0 {
+		return "", fmt.Errorf("chroma SDK error: result=%d", effectResp.Result)
+	}
+	return effectResp.ID, nil
+}
+
+// SetEffect applies a previously created effect by its ID.
+func (c *Client) SetEffect(effectID string) error {
+	payload := map[string]interface{}{
+		"id": effectID,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal set effect: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPut, c.baseURI+"/effect", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("set effect: %w", err)
+	}
+	defer resp.Body.Close()
+	return c.checkResult(resp)
+}
+
+// DeleteEffect removes a previously created effect by its ID.
+func (c *Client) DeleteEffect(effectID string) error {
+	payload := map[string]interface{}{
+		"id": effectID,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal delete effect: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, c.baseURI+"/effect", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("delete effect: %w", err)
+	}
+	defer resp.Body.Close()
+	return c.checkResult(resp)
+}
+
+// putEffect sends a PUT request to apply an effect immediately.
+func (c *Client) putEffect(device DeviceType, payload interface{}) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal effect: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/chromasdk/%s", c.baseURI, device)
+	url := fmt.Sprintf("%s/%s", c.baseURI, device)
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
@@ -199,5 +312,17 @@ func (c *Client) putEffect(device string, payload interface{}) error {
 		return fmt.Errorf("put effect to %s: %w", device, err)
 	}
 	defer resp.Body.Close()
+	return c.checkResult(resp)
+}
+
+// checkResult parses the response body and returns an error if the SDK reports a non-zero result.
+func (c *Client) checkResult(resp *http.Response) error {
+	var effectResp EffectResponse
+	if err := json.NewDecoder(resp.Body).Decode(&effectResp); err != nil {
+		return nil // best-effort: don't fail if response isn't parseable
+	}
+	if effectResp.Result != 0 {
+		return fmt.Errorf("chroma SDK error: result=%d", effectResp.Result)
+	}
 	return nil
 }

@@ -34,6 +34,45 @@ All agents map to a set of canonical events with default colors. Colors are full
 | ContextCompacting  | Brief flash               | 🟣 Purple           | Compacting context       |
 | Notification       | Brief flash               | ⚪ White             | Generic notification     |
 
+## Chroma SDK REST API
+
+This project communicates with the [Razer Chroma SDK REST API v4.0](https://assets.razerzone.com/dev_portal/REST/html/index.html).
+
+**Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `http://localhost:54235/razer/chromasdk` | POST | Initialize session (returns session URI) |
+| `{uri}/heartbeat` | PUT | Keep session alive (must be sent within 15s timeout) |
+| `{uri}/keyboard` | PUT/POST | Apply effect to keyboard |
+| `{uri}/mouse` | PUT/POST | Apply effect to mouse |
+| `{uri}/mousepad` | PUT/POST | Apply effect to mousepad |
+| `{uri}/headset` | PUT/POST | Apply effect to headset |
+| `{uri}/keypad` | PUT/POST | Apply effect to keypad |
+| `{uri}/chromalink` | PUT/POST | Apply effect to ChromaLink devices |
+| `{uri}/effect` | PUT | Apply a previously created effect by ID |
+| `{uri}/effect` | DELETE | Remove a previously created effect by ID |
+| `{uri}` | DELETE | Terminate session |
+
+**Effect types:** `CHROMA_NONE`, `CHROMA_STATIC`, `CHROMA_CUSTOM`, `CHROMA_CUSTOM2`, `CHROMA_CUSTOM_KEY`
+
+PUT applies the effect immediately. POST creates the effect and returns an effect ID for later use.
+
+**Color format:** BGR (Blue-Green-Red) packed as a single integer: `B<<16 | G<<8 | R`
+
+**Device grid dimensions:**
+
+| Device | Grid |
+|--------|------|
+| Keyboard | 6 rows × 22 cols |
+| Mouse | 9 rows × 7 cols |
+| Mousepad | 15 LEDs |
+| Headset | 5 LEDs |
+| Keypad | 4 rows × 5 cols |
+| ChromaLink | 5 elements |
+
+Full API reference: https://assets.razerzone.com/dev_portal/REST/html/index.html
+
 ## Requirements
 
 - **Windows** with Razer Synapse installed (Chroma SDK enabled)

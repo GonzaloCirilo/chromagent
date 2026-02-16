@@ -1,3 +1,3 @@
-module github.com/GonzaloCirilo/agent-chroma
+module github.com/GonzaloCirilo/chromagent
 
 go 1.22

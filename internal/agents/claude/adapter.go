@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/GonzaloCirilo/agent-chroma/internal/agents"
-	"github.com/GonzaloCirilo/agent-chroma/internal/hooks"
+	"github.com/GonzaloCirilo/chromagent/internal/agents"
+	"github.com/GonzaloCirilo/chromagent/internal/hooks"
 )
 
 func init() {

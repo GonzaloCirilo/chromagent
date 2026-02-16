@@ -6,13 +6,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/GonzaloCirilo/agent-chroma/internal/agents"
-	"github.com/GonzaloCirilo/agent-chroma/internal/chroma"
-	"github.com/GonzaloCirilo/agent-chroma/internal/config"
+	"github.com/GonzaloCirilo/chromagent/internal/agents"
+	"github.com/GonzaloCirilo/chromagent/internal/chroma"
+	"github.com/GonzaloCirilo/chromagent/internal/config"
 
 	// Register adapters via init().
-	_ "github.com/GonzaloCirilo/agent-chroma/internal/agents/claude"
-	_ "github.com/GonzaloCirilo/agent-chroma/internal/agents/cursor"
+	_ "github.com/GonzaloCirilo/chromagent/internal/agents/claude"
+	_ "github.com/GonzaloCirilo/chromagent/internal/agents/cursor"
 )
 
 // handleEvent routes a canonical AgentEvent to the appropriate Chroma effect,

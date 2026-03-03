@@ -1,119 +1,149 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
+	"os/exec"
+	"syscall"
 	"time"
 
-	"github.com/GonzaloCirilo/chromagent/internal/agents"
 	"github.com/GonzaloCirilo/chromagent/internal/chroma"
 	"github.com/GonzaloCirilo/chromagent/internal/config"
-
-	// Register adapters via init().
-	_ "github.com/GonzaloCirilo/chromagent/internal/agents/claude"
-	_ "github.com/GonzaloCirilo/chromagent/internal/agents/cursor"
+	"github.com/GonzaloCirilo/chromagent/internal/service"
 )
 
-// handleEvent routes a canonical AgentEvent to the appropriate Chroma effect,
-// using user-configurable colors from the config.
-func handleEvent(c *chroma.Client, event agents.AgentEvent, cfg *config.Config) {
-	color := cfg.Events[event.Name()]
-	r, g, b := color[0], color[1], color[2]
-	packed := chroma.BGR(r, g, b)
-
-	switch event {
-
-	case agents.EventSessionStart:
-		// Arc reactor boot-up — a calm pulse.
-		c.Pulse(r, g, b, 15, 1500*time.Millisecond)
-
-	case agents.EventSessionEnd:
-		// Fade to dark.
-		c.Pulse(r, g, b, 10, 800*time.Millisecond)
-		c.ClearAll()
-
-	case agents.EventPromptAcknowledged:
-		// Subtle flash — acknowledged, processing.
-		c.Flash(packed, 300*time.Millisecond)
-
-	case agents.EventToolExecuting:
-		// Static while a tool is running — "working on it."
-		c.StaticAll(packed)
-
-	case agents.EventToolCompleted:
-		// Flash — tool completed successfully.
-		c.Flash(packed, 400*time.Millisecond)
-
-	case agents.EventTaskComplete:
-		// Pulse — task complete. All done, sir.
-		c.Pulse(r, g, b, 12, 1200*time.Millisecond)
-
-	case agents.EventSubtaskComplete:
-		c.Flash(packed, 300*time.Millisecond)
-
-	case agents.EventNeedsAttention:
-		// Alert flash — NEEDS YOUR ATTENTION.
-		c.AlertFlash(packed)
-		// Leave color on so you notice it.
-		err := c.StaticAll(packed)
-		if err != nil {
-			_ = fmt.Errorf("")
-		}
-
-	case agents.EventWaitingForInput:
-		// Pulse — waiting for input.
-		c.Pulse(r, g, b, 10, 1000*time.Millisecond)
-
-	case agents.EventContextCompacting:
-		// Flash — compacting context.
-		c.Flash(packed, 500*time.Millisecond)
-
-	case agents.EventNotification:
-		c.Flash(packed, 200*time.Millisecond)
-
-	case agents.EventUnknown:
-		// Silently ignore unrecognized events.
+func main() {
+	if len(os.Args) > 1 && os.Args[1] == "serve" {
+		runServe()
+		return
 	}
+	runClient()
 }
 
-func main() {
-	// Load user config (falls back to defaults if no file).
+// runServe starts the long-running daemon: initializes the Chroma SDK and
+// serves effect commands over a Unix socket until all agent sessions end.
+func runServe() {
 	cfg := config.Load()
 
-	// Read the hook JSON from stdin.
-	var raw json.RawMessage
-	if err := json.NewDecoder(os.Stdin).Decode(&raw); err != nil {
-		fmt.Fprintf(os.Stderr, "[chromagent] Failed to read stdin: %v\n", err)
-		os.Exit(0) // Exit 0 so we don't block the agent.
-	}
-
-	// Auto-detect which agent sent this event.
-	adapter := agents.DetectAdapter(raw)
-	if adapter == nil {
-		fmt.Fprintf(os.Stderr, "[chromagent] No adapter matched the input JSON\n")
-		os.Exit(0)
-	}
-	fmt.Fprintf(os.Stderr, "[chromagent] Detected agent: %s\n", adapter.Name())
-
-	// Parse the raw JSON into a canonical event.
-	event, err := adapter.ParseEvent(raw)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[chromagent] Failed to parse event: %v\n", err)
-		os.Exit(0)
-	}
-
-	// Initialize Chroma SDK session.
 	client, err := chroma.NewClient()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[chromagent] Chroma SDK init failed: %v\n", err)
+		os.Exit(1)
+	}
+	// No defer client.Close() — service.doShutdown owns the lifecycle.
+
+	srv := service.New(cfg, client)
+	if err := srv.ListenAndServe(); err != nil {
+		fmt.Fprintf(os.Stderr, "[chromagent] Server error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// runClient is the hook entrypoint: reads stdin, ensures the daemon is running,
+// and forwards the event. Always exits 0 to never block the agent's workflow.
+func runClient() {
+	var raw json.RawMessage
+	if err := json.NewDecoder(os.Stdin).Decode(&raw); err != nil {
+		fmt.Fprintf(os.Stderr, "[chromagent] Failed to read stdin: %v\n", err)
 		os.Exit(0)
 	}
-	defer client.Close()
 
-	// Route the canonical event to the appropriate effect.
-	handleEvent(client, event, cfg)
+	socketPath := service.SocketPath()
 
-	// Always exit 0 — we never want to block the agent's workflow.
+	if err := ensureServiceRunning(socketPath); err != nil {
+		fmt.Fprintf(os.Stderr, "[chromagent] Could not start service: %v\n", err)
+		os.Exit(0)
+	}
+
+	if err := forwardEvent(socketPath, raw); err != nil {
+		fmt.Fprintf(os.Stderr, "[chromagent] Forward failed: %v\n", err)
+	}
+
 	os.Exit(0)
+}
+
+// ensureServiceRunning checks if the daemon is listening on the socket, and
+// spawns it in the background if not, polling until it becomes ready.
+func ensureServiceRunning(socketPath string) error {
+	if socketReady(socketPath) {
+		return nil
+	}
+
+	if err := spawnDaemon(); err != nil {
+		return fmt.Errorf("spawn daemon: %w", err)
+	}
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if socketReady(socketPath) {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return fmt.Errorf("service did not become ready within 10 seconds")
+}
+
+// socketReady returns true if the Unix socket accepts connections.
+func socketReady(socketPath string) bool {
+	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+// detachedProcess is the Windows DETACHED_PROCESS creation flag (0x00000008).
+// It prevents the child from inheriting the parent's console window.
+const detachedProcess = 0x00000008
+
+// spawnDaemon starts `chromagent serve` as a detached background process.
+func spawnDaemon() error {
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve executable path: %w", err)
+	}
+
+	cmd := exec.Command(exe, "serve")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: detachedProcess,
+	}
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start daemon: %w", err)
+	}
+
+	// Disown the process — we don't wait for it.
+	return cmd.Process.Release()
+}
+
+// forwardEvent sends the raw event JSON to the running service via the Unix socket.
+// It waits for the response so the effect completes before the hook process exits.
+func forwardEvent(socketPath string, raw json.RawMessage) error {
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", socketPath)
+		},
+	}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   35 * time.Second, // generous: longest effect (Pulse) ~1.6s
+	}
+
+	resp, err := client.Post("http://chromagent/event", "application/json", bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("post event: %w", err)
+	}
+	resp.Body.Close()
+	return nil
 }

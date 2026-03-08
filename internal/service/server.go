@@ -232,8 +232,19 @@ func (s *Server) doShutdown() {
 	os.Exit(0)
 }
 
+// idleColor is the steady-state color shown while the daemon is connected.
+var idleColor = chroma.ColorWhite
+
+// restoreIdle sets all devices to the idle (white) color.
+func (s *Server) restoreIdle() {
+	s.chroma.StaticAll(idleColor) //nolint:errcheck
+}
+
 // dispatchEffect routes a canonical event to the appropriate Chroma effect,
 // using user-configurable colors from the config.
+// Most effects restore the idle color after completing.
+// Exceptions: SessionEnd (clears), ToolExecuting (holds until ToolCompleted),
+// NeedsAttention (holds red so user notices).
 func (s *Server) dispatchEffect(event agents.AgentEvent) {
 	color := s.cfg.Events[event.Name()]
 	r, g, b := color[0], color[1], color[2]
@@ -242,44 +253,51 @@ func (s *Server) dispatchEffect(event agents.AgentEvent) {
 	switch event {
 
 	case agents.EventSessionStart:
-		// Arc reactor boot-up — a calm pulse.
 		s.chroma.Pulse(r, g, b, 15, 1500*time.Millisecond)
+		s.restoreIdle()
 
 	case agents.EventSessionEnd:
-		// Fade to dark.
+		// Fade to dark — don't restore idle, session is ending.
 		s.chroma.Pulse(r, g, b, 10, 800*time.Millisecond)
 		s.chroma.ClearAll()
 
 	case agents.EventPromptAcknowledged:
 		s.chroma.Flash(packed, 300*time.Millisecond)
+		s.restoreIdle()
 
 	case agents.EventToolExecuting:
-		// Static while a tool is running — "working on it."
+		// Hold yellow — restored when ToolCompleted fires.
 		s.chroma.StaticAll(packed)
 
 	case agents.EventToolCompleted:
 		s.chroma.Flash(packed, 400*time.Millisecond)
+		s.restoreIdle()
 
 	case agents.EventTaskComplete:
 		s.chroma.Pulse(r, g, b, 12, 1200*time.Millisecond)
+		s.restoreIdle()
 
 	case agents.EventSubtaskComplete:
 		s.chroma.Flash(packed, 300*time.Millisecond)
+		s.restoreIdle()
 
 	case agents.EventNeedsAttention:
-		// Alert flash — NEEDS YOUR ATTENTION.
+		// Alert flash then hold red — user must see it.
+		// Restored on next event (e.g. ToolExecuting or PromptAcknowledged).
 		s.chroma.AlertFlash(packed)
-		// Leave color on so you notice it.
 		s.chroma.StaticAll(packed) //nolint:errcheck
 
 	case agents.EventWaitingForInput:
 		s.chroma.Pulse(r, g, b, 10, 1000*time.Millisecond)
+		s.restoreIdle()
 
 	case agents.EventContextCompacting:
 		s.chroma.Flash(packed, 500*time.Millisecond)
+		s.restoreIdle()
 
 	case agents.EventNotification:
 		s.chroma.Flash(packed, 200*time.Millisecond)
+		s.restoreIdle()
 
 	case agents.EventUnknown:
 		// Silently ignore unrecognized events.

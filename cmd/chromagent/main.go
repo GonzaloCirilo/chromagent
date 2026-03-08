@@ -37,6 +37,9 @@ func runServe() {
 	}
 	// No defer client.Close() — service.doShutdown owns the lifecycle.
 
+	// Set idle (white) immediately after SDK init.
+	client.StaticAll(chroma.ColorWhite) //nolint:errcheck
+
 	srv := service.New(cfg, client)
 	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintf(os.Stderr, "[chromagent] Server error: %v\n", err)

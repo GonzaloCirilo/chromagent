@@ -196,27 +196,6 @@ func (c *Client) CustomKeyEffect(colors [][]int, keys [][]int) error {
 	return c.putEffect(DeviceKeyboard, payload)
 }
 
-// StaticAll sets the same static color across all supported devices.
-func (c *Client) StaticAll(color int) error {
-	var lastErr error
-	for _, d := range AllDevices {
-		if err := c.StaticEffect(d, color); err != nil {
-			lastErr = err
-		}
-	}
-	return lastErr
-}
-
-// ClearAll turns off all devices.
-func (c *Client) ClearAll() error {
-	var lastErr error
-	for _, d := range AllDevices {
-		if err := c.NoEffect(d); err != nil {
-			lastErr = err
-		}
-	}
-	return lastErr
-}
 
 // PostEffect creates an effect via POST and returns the effect ID for later use.
 func (c *Client) PostEffect(device DeviceType, payload interface{}) (string, error) {

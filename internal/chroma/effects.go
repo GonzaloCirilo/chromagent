@@ -1,7 +1,6 @@
 package chroma
 
 import (
-	"log"
 	"sync"
 	"time"
 )
@@ -29,9 +28,8 @@ func (c *Client) StaticAll(color int) error {
 		}(i, d)
 	}
 	wg.Wait()
-	for i, err := range errs {
+	for _, err := range errs {
 		if err != nil {
-			log.Printf("[chroma] StaticAll error on %s: %v", AllDevices[i], err)
 			return err
 		}
 	}

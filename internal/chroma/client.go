@@ -294,7 +294,17 @@ func (c *Client) putEffect(device DeviceType, payload interface{}) error {
 		return fmt.Errorf("put effect to %s: %w", device, err)
 	}
 	defer resp.Body.Close()
-	return c.checkResult(resp)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var effectResp EffectResponse
+	if err := json.Unmarshal(respBody, &effectResp); err != nil {
+		return nil
+	}
+	if effectResp.Result != 0 {
+		return fmt.Errorf("chroma SDK error: result=%d", effectResp.Result)
+	}
+	return nil
 }
 
 // checkResult parses the response body and returns an error if the SDK reports a non-zero result.

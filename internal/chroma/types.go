@@ -21,12 +21,15 @@ const (
 type DeviceType string
 
 const (
-	DeviceKeyboard  DeviceType = "keyboard"
-	DeviceMouse     DeviceType = "mouse"
-	DeviceMousepad  DeviceType = "mousepad"
-	DeviceHeadset   DeviceType = "headset"
-	DeviceKeypad    DeviceType = "keypad"
+	DeviceKeyboard   DeviceType = "keyboard"
+	DeviceMouse      DeviceType = "mouse"
+	DeviceMousepad   DeviceType = "mousepad"
+	DeviceHeadset    DeviceType = "headset"
+	DeviceKeypad     DeviceType = "keypad"
 	DeviceChromaLink DeviceType = "chromalink"
+	// DeviceDesktop targets ChromaLink accessories (headphone stands, mouse docks,
+	// LED strips) via the device-specific GUID endpoint in the REST API.
+	DeviceDesktop DeviceType = "devid=EB96AB11-E327-4BC0-B3E3-862BBB963B5D"
 )
 
 // AllDevices is the full set of supported device types.
@@ -37,6 +40,7 @@ var AllDevices = []DeviceType{
 	DeviceHeadset,
 	DeviceKeypad,
 	DeviceChromaLink,
+	DeviceDesktop,
 }
 
 // Grid dimensions for each device type.
@@ -58,6 +62,9 @@ const (
 	KeypadCols = 5
 
 	ChromaLinkLEDs = 5
+
+	DesktopRows = 19
+	DesktopCols = 37
 )
 
 // MouseLED2 represents mouse LED positions for CUSTOM2 effects (RZLED2).
